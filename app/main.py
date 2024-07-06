@@ -1,6 +1,5 @@
 import socket
-
-
+import sys
 
 def root(request, headers):
     return b"HTTP/1.1 200 OK\r\n\r\n"
@@ -21,9 +20,23 @@ def user_agent(request, headers):
     
     return b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(user_agent)).encode() + b"\r\n\r\n" + user_agent
 
+def files(request, headers):
+    try:
+        directory = sys.argv[2]
+        request_target = request.split(b" ")[1]
+        file_path = request_target.split(b"/")[2].decode()
+        full_path = f"{directory}{file_path}"
+        with open(full_path, "rb") as file:
+            response_body = file.read()
+    except:
+        return b"HTTP/1.1 404 Not Found\r\n\r\n"
+    
+    return b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + str(len(response_body)).encode() + b"\r\n\r\n" + response_body
+
 routes = {
     "echo": echo,
     "user-agent": user_agent,
+    "files": files,
     "": root,
 }
 
