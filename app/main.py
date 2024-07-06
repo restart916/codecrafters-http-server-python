@@ -6,8 +6,6 @@ def root(request, headers):
     return b"HTTP/1.1 200 OK\r\n\r\n"
 
 def echo(request, headers):
-    # GET /echo/abc 
-    # HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\nabc
     try:
         request_target = request.split(b" ")[1]
         response_body = request_target.split(b"/")[2]
@@ -15,8 +13,17 @@ def echo(request, headers):
         response_body = b""
     return b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(response_body)).encode() + b"\r\n\r\n" + response_body
 
+def user_agent(request, headers):
+    for header in headers:
+        if header.startswith(b"User-Agent"):
+            user_agent = header.split(b": ")[1]
+            break
+    
+    return b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(user_agent)).encode() + b"\r\n\r\n" + user_agent
+
 routes = {
     "echo": echo,
+    "user-agent": user_agent,
     "": root,
 }
 
