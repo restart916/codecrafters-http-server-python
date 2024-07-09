@@ -1,26 +1,36 @@
 import socket
 import sys
 
-def root(request, headers, request_body):
-    return b"HTTP/1.1 200 OK\r\n\r\n"
+def root(request, headers, request_body, response_info):
+    response_info['status'] = "200 OK"
+    return response_info
 
-def echo(request, headers, request_body):
+def echo(request, headers, request_body, response_info):
     try:
         request_target = request.split(b" ")[1]
         response_body = request_target.split(b"/")[2]
     except:
         response_body = b""
-    return b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(response_body)).encode() + b"\r\n\r\n" + response_body
 
-def user_agent(request, headers, request_body):
+    response_info['status'] = "200 OK"
+    response_info['headers']['Content-Type'] = "text/plain"
+    response_info['headers']['Content-Length'] = str(len(response_body))
+    response_info['body'] = response_body
+    return response_info
+
+def user_agent(request, headers, request_body, response_info):
     for header in headers:
         if header.startswith(b"User-Agent"):
             user_agent = header.split(b": ")[1]
             break
     
-    return b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(user_agent)).encode() + b"\r\n\r\n" + user_agent
+    response_info['status'] = "200 OK"
+    response_info['headers']['Content-Type'] = "text/plain"
+    response_info['headers']['Content-Length'] = str(len(user_agent))
+    response_info['body'] = user_agent
+    return response_info
 
-def files(request, headers, request_body):
+def files(request, headers, request_body, response_info):
     try:
         directory = sys.argv[2]
         request_target = request.split(b" ")[1]
@@ -29,11 +39,20 @@ def files(request, headers, request_body):
         with open(full_path, "rb") as file:
             response_body = file.read()
     except:
-        return b"HTTP/1.1 404 Not Found\r\n\r\n"
-    
-    return b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + str(len(response_body)).encode() + b"\r\n\r\n" + response_body
+        return dict(
+            http_version="HTTP/1.1",
+            headers={},
+            status="404 Not Found",
+            body=b""
+        )
 
-def create_files(request, headers, request_body):
+    response_info['status'] = "200 OK"
+    response_info['headers']['Content-Type'] = "application/octet-stream"
+    response_info['headers']['Content-Length'] = str(len(response_body))
+    response_info['body'] = response_body
+    return response_info
+
+def create_files(request, headers, request_body, response_info):
     try:
         directory = sys.argv[2]
         request_target = request.split(b" ")[1]
@@ -42,9 +61,11 @@ def create_files(request, headers, request_body):
         with open(full_path, "wb") as file:
             file.write(request_body)
     except:
-        return b"HTTP/1.1 404 Not Found\r\n\r\n"
-    
-    return b"HTTP/1.1 201 Created\r\n\r\n"
+        response_info['status'] = "404 Not Found"
+        return response_info
+
+    response_info['status'] = "201 Created"
+    return response_info    
 
 routes = [
     {
@@ -90,19 +111,37 @@ def main():
         path = request_target.split(b"/")[1].decode()
         request_body = data.split(b"\r\n\r\n")[1]
         
+        response_info = dict(
+            http_version="HTTP/1.1",
+            headers={},
+            status="404 Not Found",
+            body=b""
+        )
+
+        for header in headers:
+            if header.startswith(b"Accept-Encoding"):
+                if header.split(b": ")[1] == b"gzip":
+                    response_info['headers']["Content-Encoding"] = "gzip"
+                
         find_route = False
         for route_info in routes:
             route = route_info["route"]
             method = route_info["method"]
             if path == route and http_method == method:
                 func = route_info["func"]
-                response = func(request_line, headers, request_body)
+                response_info = func(request_line, headers, request_body, response_info)
                 find_route = True
                 break
         
         if not find_route:
-            response = b"HTTP/1.1 404 Not Found\r\n\r\n"
-        client_socket.sendall(response)
+            response_info['status'] = "404 Not Found"
+
+        response = f"{response_info['http_version']} {response_info['status']}\r\n"
+        for key, value in response_info['headers'].items():
+            response += f"{key}: {value}\r\n"
+        response += f"\r\n{response_info['body'].decode()}"
+        # print('response', response)
+        client_socket.sendall(response.encode())
         
         client_socket.close()
 
