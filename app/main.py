@@ -1,3 +1,4 @@
+import gzip
 import socket
 import sys
 
@@ -13,9 +14,13 @@ def echo(request, headers, request_body, response_info):
         response_body = b""
 
     response_info['status'] = "200 OK"
+    if response_info['headers'].get("Content-Encoding") == "gzip":
+        response_info['body'] = gzip.compress(response_body)
+    else:
+        response_info['body'] = response_body
     response_info['headers']['Content-Type'] = "text/plain"
-    response_info['headers']['Content-Length'] = str(len(response_body))
-    response_info['body'] = response_body
+    response_info['headers']['Content-Length'] = str(len(response_info['body']))
+
     return response_info
 
 def user_agent(request, headers, request_body, response_info):
@@ -140,8 +145,8 @@ def main():
         response = f"{response_info['http_version']} {response_info['status']}\r\n"
         for key, value in response_info['headers'].items():
             response += f"{key}: {value}\r\n"
-        response += f"\r\n{response_info['body'].decode()}"
-        client_socket.sendall(response.encode())
+        response += f"\r\n"
+        client_socket.sendall(response.encode() + response_info['body'])
         
         client_socket.close()
 
