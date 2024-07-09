@@ -120,7 +120,8 @@ def main():
 
         for header in headers:
             if header.startswith(b"Accept-Encoding"):
-                if header.split(b": ")[1] == b"gzip":
+                accept_encoding = header.split(b": ")[1].split(b", ")
+                if b"gzip" in accept_encoding:
                     response_info['headers']["Content-Encoding"] = "gzip"
                 
         find_route = False
@@ -140,7 +141,6 @@ def main():
         for key, value in response_info['headers'].items():
             response += f"{key}: {value}\r\n"
         response += f"\r\n{response_info['body'].decode()}"
-        # print('response', response)
         client_socket.sendall(response.encode())
         
         client_socket.close()
